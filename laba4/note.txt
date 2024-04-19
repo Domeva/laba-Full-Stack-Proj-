@@ -1,0 +1,365 @@
+validate email
+filter_var($request['register_email'], FILTER_VALIDATE_EMAIL)
+
+
+вивід користувача
+SELECT CURRENT_USER();
+
+
+перегляд привілегій
+SHOW GRANTS FOR "bookstore_administrator"@"localhost";
+
+
+для того шоб звірити пароль який перебуває в mysql.user ми використовуємо md5() який  хешує в 32 значне число і * напочатку
+ми використовуємо
+
+
+
+створення користувача, grant revoke (вони не підтриують prepare)
+
+    public function createUser($username, $password){
+        $createUser = $this->connection->query("CREATE USER '{$username}'@'{$this->server}' IDENTIFIED BY '{$password}';");
+
+        if($createUser !== TRUE) {
+            http_response_code(500);
+            die('Error while creating user!');
+        } else {
+            return true;
+        }
+    }
+
+    public function grant($username)
+    {
+        $allow = $this->connection->query("GRANT SELECT, INSERT, DELETE, UPDATE ON osbb.* TO '{$username}'@'{$this->server}';");
+
+        if($allow !== TRUE) {
+            http_response_code(500);
+            die("Error while allow access for $username!");
+        }
+
+        $flush = $this->connection->query("FLUSH PRIVILEGES;");
+        if($flush !== TRUE) {
+            http_response_code(500);
+            die("Error while flushing privileges!");
+        }
+        else{
+            return true;
+        }
+    }
+    public function revoke($username){
+        $revoke = $this->connection->query("REVOKE SELECT, INSERT, DELETE, UPDATE ON osbb.* TO '{$username}'@'{$this->server}'");
+
+        if($revoke !== TRUE) {
+            http_response_code(500);
+            die("Error while allow access for $username!");
+        }
+        else{
+            return true;
+        }
+    }
+
+
+
+    openssl - шифрування
+    $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-128-cbc'));
+    $key = openssl_random_pseudo_bytes(16); 16 для 128, 32 для 256(aes-128-cbc)
+
+    OPENSSL_RAW_DATA - сказує шо обробляюит
+
+    setcookie('username', $username, time()+60*60*7, '/');
+    setcookie('password', openssl_encrypt(base64_encode($password), 'aes-128-cbc', $key, OPENSSL_RAW_DATA, $iv)
+
+
+
+
+
+    записування значення про відвідування в файл
+
+    $counterFile = '../../counter.dat';
+
+    if (!file_exists($counterFile)) {
+        touch($counterFile);
+    }
+
+    $res_array = [];
+
+    $currentCounter = file_get_contents($counterFile);
+    $data_users = preg_split("/\n\s*/", $currentCounter);
+
+    foreach ($data_users as $users) {
+        if (!empty($users)) {
+            list($user_name, $count) = explode(": ", $users, 2);
+
+            if ($user_name === $username) {
+                $count = (int)$count + 1;
+
+                $found = false;
+                foreach ($res_array as &$res) {
+                    if ($res['username'] === $user_name) {
+                        $res['count'] = $count;
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    $res_array[] = ['username' => $user_name, 'count' => $count];
+                }
+            }
+            else {
+                $res_array[] = ['username' => $user_name, 'count' => $count];
+            }
+        }
+    }
+
+    $checkAll = false;
+    foreach ($res_array as $r) {
+        if ($r['username'] === $username) {
+            $checkAll=true;
+        }
+    }
+    if (!$checkAll) {
+        $res_array[] = ['username' => $username, 'count' => 1];
+        file_put_contents($counterFile, $username . ': ' . 1 . "\n", FILE_APPEND);
+    }
+    else{
+        file_put_contents($counterFile, '');
+        foreach ($res_array as $user) {
+            file_put_contents($counterFile, $user['username'] . ': ' . $user['count'] . "\n", FILE_APPEND);
+        }
+    }
+
+
+    використання window function for id
+    SELECT ROW_NUMBER() over () as id,
+
+
+    GRANT OPTION - Коли користувач має привілегію GRANT OPTION на певні дії з об'єктами бази даних, він може надавати цю саму привілегію іншим користувачам
+
+
+
+    script view crud
+
+    задання значення в базу даних через select inner join
+
+        public function getData(){
+            $createTable = $this->connection->prepare('CREATE TABLE IF NOT EXISTS entry_object_table (
+                id INT(11) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                entry_number INT(11) UNSIGNED NOT NULL,
+                work_staff INT(11) UNSIGNED NOT NULL,
+                flat_number INT(11) UNSIGNED NOT NULL,
+                owner_firstname VARCHAR(255) NOT NULL,
+                owner_secondname VARCHAR(255) NOT NULL,
+                services_price DECIMAL(10, 2) UNSIGNED NOT NULL
+            );');
+            if($createTable->execute() !== TRUE){
+                http_response_code(500);
+                die("Error while create table!");
+            }
+
+            $check = $this->connection->prepare('SELECT COUNT(*) as count_col FROM entry_object_table');
+            $count = 0;
+            if($check->execute() === TRUE){
+                $result = $check->get_result();
+                if($result->num_rows > 0){
+                    while ($row = $result->fetch_assoc()){
+                        $count = (int)$row['count_col'];
+                    }
+                }
+            }
+
+            if ($count === 0) {
+                $insert = $this->connection->prepare('
+                    INSERT INTO entry_object_table (entry_number, work_staff, flat_number, owner_firstname, owner_secondname, services_price)
+                    SELECT
+                        building_entrance.entrance_number AS entry_number,
+                        entrance_details.site_staff + entrance_details.office_staff AS work_staff,
+                        flat.flat_number AS flat_number,
+                        flat.f_name_owner AS owner_firstname,
+                        flat.s_name_ownwer AS owner_secondname,
+                        flat.services_price AS services_price
+                    FROM building_entrance
+                    INNER JOIN entrance_details ON entrance_details.entrance_number = building_entrance.entrance_number
+                    INNER JOIN flat ON flat.entrance_number = entrance_details.entrance_number;
+                ');
+
+                if ($insert->execute() !== TRUE) {
+                    http_response_code(500);
+                    die("Error while insert into table!");
+                }
+                else{
+                    $insert->close();
+                }
+            }
+
+            $array_data = [];
+
+            $select_data = $this->connection->prepare("SELECT * FROM entry_object_table");
+
+            if($select_data->execute() !== TRUE){
+                http_response_code(500);
+                die("Error while getting data !");
+            }
+
+            $result = $select_data->get_result();
+            if($result->num_rows > 0){
+                while($row = $result->fetch_assoc()){
+                    $array_data[] = $row;
+                }
+            }
+
+            $createTable->close();
+            $select_data->close();
+
+            return $array_data;
+        }
+
+        public function checkEntry($entry){
+            $checkEntry = $this->connection->prepare('SELECT * FROM building_entrance where entrance_number = ?');
+            $entry = (int)$entry;
+            $checkEntry->bind_param('i', $entry);
+
+            if($checkEntry->execute() !== TRUE){
+                http_response_code(500);
+                die("Error while check entry !");
+            }
+            else{
+                $result = $checkEntry->get_result();
+                $checkEntry->close();
+                if($result->num_rows > 0){
+                    return false;
+                }
+                else{
+                    return true;
+                }
+            }
+        }
+
+
+
+        додавання значення в formData
+        const formData = new FormData(addUpdateModalParams.form);
+        formData.append('action', addUpdateModalParams.action);
+
+
+        відслідковування на клік поза дочірній елемент
+
+            document.body.onclick = (e) => {
+                if(!e.target.closest('#add_update_modal')){
+                    modalUpdateAddErrors();
+                    addUpdateModalParams.form.reset();
+                }
+            }
+
+
+        фільтрація по частині значення тобто не по всьому
+                $keyword = '%' . $value . '%'; ці знаки і використання LIKE
+
+                $search_array = [];
+
+                $search = $this->connection->prepare("SELECT id FROM entry_object_table WHERE CONCAT(owner_firstname, ' ', owner_secondname) LIKE ?");
+                $search->bind_param('s', $keyword);
+
+                if($search->execute() !== TRUE){
+                    http_response_code(500);
+                    die("Error while search!");
+                }
+                else{
+                    $result = $search->get_result();
+                    if($result->num_rows > 0){
+                        while($row = $result->fetch_assoc()){
+                            $search_array[] = $row;
+                        }
+                    }
+                    $search->close();
+
+                    return $search_array;
+                }
+
+        корисний спосіб для перевірки
+            if (searchedIds.some(obj => parseInt(obj.id) === entryId)) {
+                row.classList.remove('none');
+            } else {
+                row.classList.add('none');
+            }
+
+            /\D/ - all non digits \d - digits \d{set interval якшо не вказувати то всі}
+            $clear_number = preg_replace("/\D/", '', $request['phone_number_owner']);
+            if(!preg_match('/^\d{10,11}$/', $clear_number)){
+                $errors[] = ['code' => 10, 'message' => 'Phone number is not active!'];
+            }
+
+
+
+            виконання вставки 1 раз
+
+                session_start();
+                if (!isset($_SESSION['added']) || !$_SESSION['added']) {
+                    $insert_data = $this->connection->prepare('
+                        INSERT INTO owners_flats (`entrance_number`, `flat_number`, `owner_firstname`,
+                              `owner_secondname`, `phone_number_owner`, `services_price`, `tenants`)
+                        SELECT
+                            flat.entrance_number AS entrance_number,
+                            flat.flat_number AS flat_number,
+                            flat.f_name_owner AS owner_firstname,
+                            flat.s_name_owner AS owner_secondname,
+                            flat.phone_number_owner AS phone_number_owner,
+                            flat.services_price AS services_price,
+                            flat.tenants AS tenants
+                        FROM entrance_details
+                        INNER JOIN flat ON flat.entrance_number = entrance_details.entrance_number;
+                    ');
+
+                    if ($insert_data->execute()) {
+                        $_SESSION['added'] = true;
+                    } else {
+                        http_response_code(500);
+                        die("Error while inserting data into owners_flats!");
+                    }
+                }
+                session_write_close();
+
+
+
+
+    очищення форми якшо клік поза
+        addUpdateModal._element.onclick = (e) => {
+            if(!e.target.closest('#add_update_form')){
+                modalUpdateAddErrors();
+                addUpdateModalParams.form.reset();
+            }
+        }
+
+
+
+    перевірка на унікальність 2 значеннь
+    для додавання і для оновлення
+
+        public function checkEntryFlat($request)
+        {
+            $id = (int)$request['update_id'];
+
+            $checkEntryFlat = $this->connection->prepare('SELECT * FROM owners_flats WHERE entrance_number = ? AND flat_number = ?');
+
+            $entry = (int)$request['entrance_number'];
+            $flat = (int)$request['flat_number'];
+
+            $checkEntryFlat->bind_param('ii', $entry, $flat);
+
+            if (!$checkEntryFlat->execute()) {
+                http_response_code(500);
+                die("Error executing check query: " . $this->connection->error);
+            } else {
+                $result = $checkEntryFlat->get_result();
+                $row = $result->fetch_assoc();
+                $checkEntryFlat->close();
+
+                if (($result->num_rows === 1 && (int)$row['id'] === $id) || $result->num_rows === 0) {
+                    $request['update_id'] = null;
+                    return true;
+                }
+                else {
+                    $request['update_id'] = null;
+                    return false;
+                }
+            }
+        }
