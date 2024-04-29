@@ -1,0 +1,68 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body{
+    font-family: sans-serif;
+    min-height: 100%;
+    color: #555;
+}
+nav{
+    display: flex;
+    justify-content: flex-start; /* Вирівнюємо елементи по лівому краю */
+    grid-template-columns: auto 1fr;
+    grid-column-gap: 30px;
+    grid-template-rows: 70px;
+    box-shadow: 0 5px 5px rgba(0,0,0,0.15);
+    top: 0;
+    background-color: white;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+nav .brand{
+    font-size: 28px;
+    font-weight: bold;
+    color: #245990;
+}
+nav .links {
+    margin-right: auto; /* Залишаємо простір між лівим краєм і елементами */
+}
+
+nav .login {
+    margin-left: auto; /* Розміщуємо елемент справа */
+}
+nav a
+{
+    text-decoration: none;
+    display: inline-block;
+    padding: 10px 35px;
+    transition: background-color 0.3s, color 0.3s;
+    color:#245990;
+    font-size: 18px;
+}
+nav a:hover,
+nav a.active{
+    background: #4d9176;
+    color: #fff;
+    border-radius: 3px;
+}
+
+header{
+    padding: 15px 18px;
+    background-color: #f4f4f4;
+}
+header h1{
+
+}
+header .sub-title{
+    margin-top: 20px;
+    line-height: 28px;
+    
+}
+footer{
+    background-color: #333;
+    padding: 10px;
+    width: 100%;
+    color: white;
+}
